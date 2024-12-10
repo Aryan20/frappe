@@ -726,24 +726,38 @@ class Database:
 				distinct=distinct,
 			).run(pluck=pluck, debug=debug, as_dict=False)
 
-			meta = frappe.get_meta(doctype)
-			field_types = {field.fieldname: field.fieldtype for field in meta.fields}
-			r_list = [
-				(
-					fieldname[0],
-					int(fieldname[1]) if field_types.get(fieldname[0]) == "Check" else fieldname[1],
-				)
-				for fieldname in r
-			]
-			r = tuple(r_list)
-
 			if not run:
 				return r
 
 			if not r:
 				return []
 
-			r = frappe._dict(r)
+			meta = frappe.get_meta(doctype)
+			r_list = []
+
+			for fieldname, value in r:
+				meta_field = meta.get_field(fieldname)
+				if not meta_field:
+					return
+				meta_field_type = meta_field.fieldtype
+				meta_field_precision = meta_field.precision
+				if meta_field_type == "Check" or meta_field_type == "Int":
+					value = int(value)
+				elif meta_field_type == "Float" or meta_field_type == "Percent":
+					settings_meta = frappe.get_meta("System Settings")
+					settings_precision = settings_meta.get_field("float_precision").precision
+					if meta_field_precision == "" or meta_field_precision is None:
+						if settings_precision and settings_precision != "":
+							value = round(float(value), int(settings_precision))
+						else:
+							value = float(value)
+					else:
+						value = round(float(value), int(meta_field_precision))
+				elif meta_field_type == "Rating":
+					value = float(value)
+				r_list.append((fieldname, value))
+
+			r = frappe._dict(r_list)
 			if update:
 				r.update(update)
 
