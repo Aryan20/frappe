@@ -726,6 +726,17 @@ class Database:
 				distinct=distinct,
 			).run(pluck=pluck, debug=debug, as_dict=False)
 
+			meta = frappe.get_meta(doctype)
+			field_types = {field.fieldname: field.fieldtype for field in meta.fields}
+			r_list = [
+				(
+					fieldname[0],
+					int(fieldname[1]) if field_types.get(fieldname[0]) == "Check" else fieldname[1],
+				)
+				for fieldname in r
+			]
+			r = tuple(r_list)
+
 			if not run:
 				return r
 
